@@ -475,6 +475,7 @@ export default function Home() {
                             <Input 
                               placeholder="Your company name" 
                               {...field}
+                              value={field.value ?? ""}
                               data-testid="input-company"
                             />
                           </FormControl>
