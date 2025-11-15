@@ -1,5 +1,6 @@
-import { type User, type InsertUser, type ContactSubmission, type InsertContact } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { type User, type InsertUser, type ContactSubmission, type InsertContact, users, contactSubmissions } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -9,51 +10,35 @@ export interface IStorage {
   getAllContactSubmissions(): Promise<ContactSubmission[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private contactSubmissions: Map<string, ContactSubmission>;
-
-  constructor() {
-    this.users = new Map();
-    this.contactSubmissions = new Map();
-  }
-
+export class DbStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
   }
 
   async createContactSubmission(insertContact: InsertContact): Promise<ContactSubmission> {
-    const id = randomUUID();
-    const contactSubmission: ContactSubmission = {
-      id,
+    const result = await db.insert(contactSubmissions).values({
       name: insertContact.name,
       email: insertContact.email,
       company: insertContact.company ?? null,
       message: insertContact.message,
-      createdAt: new Date(),
-    };
-    this.contactSubmissions.set(id, contactSubmission);
-    return contactSubmission;
+    }).returning();
+    return result[0];
   }
 
   async getAllContactSubmissions(): Promise<ContactSubmission[]> {
-    return Array.from(this.contactSubmissions.values()).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    return await db.select().from(contactSubmissions).orderBy(contactSubmissions.createdAt);
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DbStorage();
